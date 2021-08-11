@@ -14,8 +14,25 @@
 #include <sys/types.h>
 #include <time.h>
 #include <pthread.h>
+#include "osqueue.h"
 
-pthread_t th;
+#define THREAD_POOL_SIZE 20
+
+pthread_t th[THREAD_POOL_SIZE];
+OSQueue* thread_q;
+
+
+void * thread_func(void * p);
+void * new_connection(void * p);
+
+void * thread_func(void  * p) {
+    while(1){
+        if(osIsQueueEmpty(thread_q) != 1) {
+            int *p_connfd = osDequeue(thread_q);
+            new_connection(p_connfd);
+        }
+    }
+}
 
 void * new_connection(void * p_connfd)
 {
@@ -34,6 +51,18 @@ void * new_connection(void * p_connfd)
 
 int main(int argc, char *argv[])
 {
+    //first creating a bunch of threads for later use
+    int i, retcode;
+    for(i=0; i<THREAD_POOL_SIZE; i++){
+        retcode = pthread_create(&th[i], NULL, thread_func, NULL);
+        if(retcode != 0){
+            printf("Create thread failed with error %d\n", retcode);
+        }
+    }
+
+    //creating the queue
+    thread_q = osCreateQueue();
+
     //server tcp
     int listenfd = 0, connfd = 0,len;
     struct sockaddr_in serv_addr,remote_addr;
@@ -64,10 +93,8 @@ int main(int argc, char *argv[])
         int retcode;
         int *p_connfd = malloc(sizeof(int ));
         *p_connfd = connfd;
-        retcode = pthread_create(&th, NULL, new_connection, p_connfd);
-        if (retcode != 0) {
-            printf("Create thread failed with error %d\n", retcode);
-        }
+        osEnqueue(thread_q, p_connfd);
+
 
     }
 
