@@ -20,6 +20,7 @@
 pthread_t th[THREAD_POOL_SIZE];
 OSQueue* thread_q;
 pthread_mutex_t queue_mutex;
+pthread_cond_t cond;
 
 
 void *handle_connection(void *p_connfd);
@@ -44,6 +45,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    //create condition variable
+    if (pthread_cond_init(&cond, NULL) != 0) {
+        perror("pthread_cond_init() error");
+    }
+
     //create threadpool
     int i;
     for(i=0; i<THREAD_POOL_SIZE; i++){
@@ -52,8 +58,6 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
-
-
 
 
     if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
@@ -75,27 +79,31 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    while(1){
+    while(1) {
         len = sizeof(struct sockaddr_in);
-        if((connfd = accept(listenfd, (struct sockaddr*)&remote_addr, (socklen_t*)&len)) < 0){
+        if ((connfd = accept(listenfd, (struct sockaddr *) &remote_addr, (socklen_t *) &len)) < 0) {
             perror("Accept failed: ");
         }
-        inet_ntop(AF_INET,&(remote_addr.sin_addr),addressBuff,len);	//copy the address to string
+        inet_ntop(AF_INET, &(remote_addr.sin_addr), addressBuff, len);    //copy the address to string
         printf("got connection from: %s:%d\n", addressBuff, ntohs(remote_addr.sin_port));
 
         int *pclient = malloc(sizeof(int));
         *pclient = connfd;
         pthread_mutex_lock(&queue_mutex);
         osEnqueue(thread_q, pclient);
+        pthread_cond_signal(&cond);
         pthread_mutex_unlock(&queue_mutex);
-
     }
+
 }
+
 
 void *thread_func(void *args){
     while(1){
         pthread_mutex_lock(&queue_mutex);
         if(osIsQueueEmpty(thread_q) != 1){
+            //only if can get work from the queue
+            pthread_cond_wait(&cond, &queue_mutex);
             int *p_connfd = osDequeue(thread_q);
             handle_connection(p_connfd);
         }
