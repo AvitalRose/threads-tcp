@@ -17,8 +17,9 @@
 #define THREAD_POOL_SIZE 20
 
 
-//pthread_t th[THREAD_POOL_SIZE];
-//OSQueue* thread_q;
+pthread_t th[THREAD_POOL_SIZE];
+OSQueue* thread_q;
+pthread_mutex_t queue_mutex;
 
 
 void *handle_connection(void *p_connfd);
@@ -30,14 +31,28 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in serv_addr, remote_addr;
     char addressBuff[300];
 
+
+    //create queue
+    thread_q = osCreateQueue();
+    if (thread_q == NULL) {
+        printf("error creating thread queue");
+    }
+
+    //create queue lock
+    if((pthread_mutex_init(&queue_mutex, NULL)) != 0){
+        printf("Failed to create queue mutex");
+        return 1;
+    }
+
     //create threadpool
-//    int i;
-//    for(i=0; i<THREAD_POOL_SIZE; i++){
-//        if((pthread_create(&th[i], NULL, thread_func, NULL)) != 0 ){
-//            perror("thread creation fail: ");
-//            return 1;
-//        }
-//    }
+    int i;
+    for(i=0; i<THREAD_POOL_SIZE; i++){
+        if((pthread_create(&th[i], NULL, thread_func, NULL)) != 0 ){
+            perror("thread creation fail: ");
+            return 1;
+        }
+    }
+
 
 
 
@@ -70,13 +85,23 @@ int main(int argc, char *argv[]) {
 
         int *pclient = malloc(sizeof(int));
         *pclient = connfd;
-        pthread_t t;
-        pthread_create(&t, NULL, handle_connection, pclient);
+        pthread_mutex_lock(&queue_mutex);
+        osEnqueue(thread_q, pclient);
+        pthread_mutex_unlock(&queue_mutex);
 
     }
 }
 
-
+void *thread_func(void *args){
+    while(1){
+        pthread_mutex_lock(&queue_mutex);
+        if(osIsQueueEmpty(thread_q) != 1){
+            int *p_connfd = osDequeue(thread_q);
+            handle_connection(p_connfd);
+        }
+        pthread_mutex_unlock(&queue_mutex);
+    }
+}
 
 
 void *handle_connection(void* p_connfd){
