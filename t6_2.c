@@ -5,9 +5,20 @@
 //To compile: gcc -l pthread T6_2.c
 #include <pthread.h>
 #include <stdio.h>
+#include <unistd.h>
 
 int int_Val[5] = {0,0,0,0,0};
 pthread_t th[5];
+
+void printids(const char *s)
+{
+    pid_t      pid;
+    pthread_t  tid;
+
+    pid = getpid();
+    tid = pthread_self();
+    printf("%s pid %u tid %u\n", s, (unsigned int)pid,(unsigned int)tid);
+}
 
 void *add_to_value(void *arg) { // arg = 0, 1, 2, 3 ,4
     int inData = *((int*)arg);
@@ -15,6 +26,8 @@ void *add_to_value(void *arg) { // arg = 0, 1, 2, 3 ,4
     for(i = 0; i < 10000; i++){
         int_Val[i % 5] += inData; /* ? */
     }
+    printids("new thread");
+
 
     /* Expectation (under the incorrect assumption that threads will run one after another for sure):
       thread 0: [0,0,0,0,0] (+0 to each cell)
