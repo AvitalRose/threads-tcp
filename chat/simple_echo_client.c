@@ -42,10 +42,8 @@ int main(int argc, char *argv[]) {
     while(1){
         printf("Enter message: \n");
         fgets(sendBuff, sizeof(sendBuff),stdin);
-        printf("send buff is: %s\n", sendBuff);
         fflush(stdin);
-        scanf("%s", sendBuff);
-        printf("sending %s\n", sendBuff);
+
 
         //Send some data
         if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
