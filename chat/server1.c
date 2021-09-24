@@ -42,11 +42,12 @@ typedef struct{
     int listenfd;
 } socketVariables;
 
-struct os_queue connection_queue;
+OSQueue *connection_queue;
 pthread_mutex_t connection_mutex;
 
 void *handle_connection(void* p_connfd);
 void *new_connection_handler(void* mainSocketDate);
+void print_queue(OSQueue *queue);
 
 int main(){
 
@@ -77,7 +78,7 @@ int main(){
     pthread_t new_connection;
     int *p_listenfd = malloc(sizeof(int));
     *p_listenfd = listenfd;
-    if((pthread_create(&new_connection, NULL, new_connection_handgiler, p_listenfd)) != 0){
+    if((pthread_create(&new_connection, NULL, new_connection_handler, p_listenfd)) != 0){
         perror("new connection handler thread creation failed: ");
         return 1;
     }
@@ -86,7 +87,18 @@ int main(){
         return 1;
     }
     printf("after join\n");
-//    sleep(2);
+//    OSQueue *new_queue = osCreateQueue();
+//    int num = 1;
+//    int num2 = 2;
+//    int num3 = 3;
+//    int num4 = 4;
+//    osEnqueue(new_queue, &num);
+//    osEnqueue(new_queue, &num2);
+//    osEnqueue(new_queue, &num3);
+//    osEnqueue(new_queue, &num4);
+//    print_queue(new_queue);
+//    print_queue(new_queue);
+//    print_queue(new_queue);
 
 
 
@@ -121,11 +133,13 @@ void *new_connection_handler(void* p_listenfd){
     struct sockaddr_in remote_addr;
     int chat_size = 0, connfd, len;
     char addressBuff[300];
+    connection_queue = osCreateQueue();
 
     while(1){
         if ((connfd = accept(listenfd, (struct sockaddr *) &remote_addr, (socklen_t *) &len)) < 0) {
             perror("Accept failed: ");
         } else {
+            osEnqueue(connection_queue, &connfd);
             chat_size++;
         }
         inet_ntop(AF_INET, &(remote_addr.sin_addr), addressBuff, len);    //copy the address to string
@@ -150,8 +164,37 @@ void *handle_connection(void* p_connfd){
     ticks = time(NULL);
     snprintf(sendBuff, sizeof(sendBuff), "%.24s\r\n", ctime(&ticks));
     sleep(2);
-
+//    OSQueue *tmp_con = osCreateQueue();
+//    while(osIsQueueEmpty(connection_queue) != 1){
+//        int *con = osDequeue(connection_queue);
+//        printf("connection fd: %d\n", *con);
+//        osEnqueue(tmp_con, con);
+//    }
+//    while(osIsQueueEmpty(tmp_con) != 1){
+//        int *tmp = osDequeue(tmp_con);
+//        osEnqueue(connection_queue, tmp);
+//        printf("putting back %d\n", *tmp);
+//    }
     write(connfd, sendBuff, strlen(sendBuff));
     close(connfd);
     sleep(1);
+}
+
+void print_queue(OSQueue *queue){
+
+
+    printf("now printing queue");
+    int *p1;
+    OSQueue *tmp_queue = osCreateQueue();
+    while(osIsQueueEmpty(queue) != 1){
+        p1 = osDequeue(queue);
+        osEnqueue(tmp_queue, p1);
+        printf("the number is %d\n", *p1);
+    }
+    int *p2;
+    while(osIsQueueEmpty(tmp_queue) != 1){
+        p2 = osDequeue(tmp_queue);
+        osEnqueue(queue, p2);
+    }
+
 }
