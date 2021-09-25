@@ -42,6 +42,7 @@ int main() {
             perror("Accept failed: ");
         } else {
             inet_ntop(AF_INET, &(remote_addr.sin_addr), addressBuff, len);
+            fflush(stdout);
             printf("got connection from: %s:%d\n", addressBuff, ntohs(remote_addr.sin_port));
         }
         while (1) {
@@ -49,7 +50,7 @@ int main() {
             if ((read = recv(connfd, recvBuff, recvBuffSize, 0)) < 0) {
                 perror("Read from client failed: ");
             }
-            printf("%s\n", recvBuff);
+            printf("%s", recvBuff);
             if (!read) {//done reading
                 break;
             }

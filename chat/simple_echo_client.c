@@ -10,11 +10,11 @@
 #include <string.h>
 
 int main(int argc, char *argv[]) {
-    int sockfd = 0, n = 0;
+    int sockfd = 0;
     char recvBuff[1024];
     char sendBuff[1024];
-    char message[1024];
-    struct sockaddr_in serv_addr, my_add;
+    char clientName[1024];
+    struct sockaddr_in serv_addr;
 
     if (argc != 2) {
         printf("\n Usage: %s <ip of server> \n", argv[0]);
@@ -35,17 +35,45 @@ int main(int argc, char *argv[]) {
     }
 
     if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        printf("\n Error: Connect Failed \n");
+        printf("Error: Connect Failed \n");
         return 1;
     }
+
+    //---Entered the server---
+    printf("Welcome to the chat!\nPlease enter your name (up to 100 characters)\n");
+    fgets(clientName, sizeof(clientName),stdin);
+    fflush(stdin);
+    strcat(clientName, ": ");
+    printf("name length: %ld\n", strlen(clientName));
+    fflush(stdout);
 
     while(1){
         printf("Enter message: \n");
         fgets(sendBuff, sizeof(sendBuff),stdin);
         fflush(stdin);
+        sendBuff[strlen(sendBuff) -1] = '\0';
+        if(strcmp(sendBuff, "exit") == 0){
+            printf("Bye Bye!\n");
+//            strcat(clientName, ": exited chat");
+//            strcpy(sendBuff, clientName);
+//            if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
+//            {
+//                puts("Send failed");
+//                return 1;
+//            }
+            break;
+        }
+
 
 
         //Send some data
+        char tmpClientName[1024];
+        strcpy(tmpClientName, clientName);
+        strcat(clientName, sendBuff);//adding name to data
+        strcpy(sendBuff, clientName);//putting back to send buff, for clarity
+        clientName[0] = '\0';
+        strcpy(clientName, tmpClientName);
+
         if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
         {
             puts("Send failed");
@@ -59,7 +87,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        printf("Server Reply: %s\n", recvBuff);
+        printf("Server Reply: %s", recvBuff);
         recvBuff[0]='\0';
 
     }
