@@ -150,10 +150,14 @@ void *handle_connection(void *p_uid){
             perror("Read from client failed: ");
         }
         printf("strlen of recvBuff is %ld, recvBuff is %s\n", strlen(recvBuff), recvBuff);
-//        if(strcmp(recvBuff, "exit") == 0){
-//            remove_from_queue(uid);
-//        }
+        if(strcmp(recvBuff, "exit") == 0){
+            printf("exit\n");
+            remove_from_queue(uid);
+        }
         broadcast_message(recvBuff, client->client_id);
+        memset(recvBuff, 0, sizeof(recvBuff));
+        recvBuff[0] = '\0';
+        printf("chopped it to zero\n");
         if (!read) {//done reading
             break;
         }
@@ -201,16 +205,19 @@ void *broadcast_message(char message[], int uid){
             }
         }
     }
+    memset(message, 0, strlen(message));
     pthread_mutex_unlock(&connection_mutex);
 }
 
 void remove_from_queue(int uid){
     pthread_mutex_lock(&connection_mutex);
-    for(int i =0; i<=MAX_CONNECTIONS; i++){
-        printf("comparing client id in %d place which is %d with given id %d\n", i, clientsArr[i]->listenfd, uid);
-        if(clientsArr[i]->client_id == uid){
-            printf("should be removed\n");
-            fflush(stdout);
+    for(int i =0; i<MAX_CONNECTIONS; i++){
+        if(clientsArr[i]){
+            printf("comparing client id in %d place which is %d with given id %d\n", i, clientsArr[i]->listenfd, uid);
+            if(clientsArr[i]->client_id == uid){
+                printf("should be removed %d\n", uid);
+                fflush(stdout);
+            }
         }
     }
     pthread_mutex_unlock(&connection_mutex);

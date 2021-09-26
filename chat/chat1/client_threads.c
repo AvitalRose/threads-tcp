@@ -28,6 +28,7 @@ int sockfd = 0;
 int main(int argc, char *argv[]) {
 //    int sockfd = 0;
     struct sockaddr_in serv_addr;
+    char sendBuff[BUFF_SIZE];
 
 
     if (argc != 2) {
@@ -35,8 +36,12 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    //setting up signal for ctrl+c
-    signal(SIGINT, intHandler);
+    //setting up name
+    printf("Enter name: (up to 100 characters)\n");
+    fflush(stdout);
+    fgets(sendBuff, sizeof(sendBuff),stdin);
+    fflush(stdin);
+    sendBuff[strlen(sendBuff) -1] = '\0';
 
 
     //setting up client socket
@@ -58,6 +63,10 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    if(send(sockfd, sendBuff, sizeof(sendBuff), 0) < 0){
+        perror("Send name failed: \n");
+    }
+
     //create listen and receive thread
     pthread_t send_thread;
     int *p_sockfd = malloc(sizeof(int));
@@ -72,6 +81,10 @@ int main(int argc, char *argv[]) {
         perror("Send thread creation fail: ");
         return -1;
     }
+
+
+    //setting up signal for ctrl+c
+    signal(SIGINT, intHandler);
 
     //wait for both threads to terminate
     pthread_join(send_thread, NULL);
@@ -103,6 +116,7 @@ void *send_func(void *p_sockfd){
             return NULL;
         }
         printf("tried sending %s\n", sendBuff);
+        memset(sendBuff, 0, sizeof(sendBuff));
         sendBuff[0]='\0';
     }
 }
@@ -120,13 +134,13 @@ void *recv_func(void *p_sockfd){
             printf("%s\n", recvBuff);
             printf("->");
             fflush(stdout);
+            recvBuff[0] = '\0';
         } else if(receive == 0) {
             break;
         } else {
             memset(recvBuff, 0, sizeof(recvBuff));
         }
     }
-
 }
 
 
@@ -139,6 +153,16 @@ void intHandler(int sig_num){
 //function to terminate chat
 int terminate(){
     printf("Terminating chat\n");
+    char sendBuff[BUFF_SIZE];
+    strcpy(sendBuff, "exit");
+    printf("send buff is %s\n", sendBuff);
+    if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
+    {
+        puts("Send exit failed: ");
+        return -1;
+    } else {
+        printf("sent exit message\n");
+    }
     close(sockfd);
     exit(1);
 }
