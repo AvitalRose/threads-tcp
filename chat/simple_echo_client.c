@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
         sendBuff[strlen(sendBuff) -1] = '\0';
         if(strcmp(sendBuff, "exit") == 0){
             printf("Bye Bye!\n");
+
 //            strcat(clientName, ": exited chat");
 //            strcpy(sendBuff, clientName);
 //            if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
