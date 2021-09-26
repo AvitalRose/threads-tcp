@@ -1,0 +1,5 @@
+
+ Usage: ./client <ip of server> 
+Error: Connect Failed
+
+
