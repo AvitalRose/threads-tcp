@@ -50,12 +50,16 @@ pthread_mutex_t connection_mutex;
 pthread_mutex_t message_mutex;
 
 socketVariables *clientIdArr[MAX_CONNECTIONS];
+int chat_size;
+
 
 void *handle_connection(void* p_connfd);
 void *new_connection_handler(void* mainSocketDate);
 void print_queue(OSQueue *queue);
 void add_to_queue(socketVariables *clientId);
 void print_arr_queue(void *data);
+void *broadcast_message(void *data);
+void remove_from_queue(void *data);
 
 
 
@@ -108,7 +112,8 @@ void *new_connection_handler(void* p_listenfd){
     int listenfd = *((int*)p_listenfd);
     free(p_listenfd);
     struct sockaddr_in remote_addr;
-    int chat_size = 1, connfd, len, client_id = 1;
+    int  connfd, len, client_id = 1;
+    chat_size = 1;
     char addressBuff[300];
     char max_message[1024];
     strcpy(max_message, "Server reached max connections, try later");
@@ -119,28 +124,32 @@ void *new_connection_handler(void* p_listenfd){
         if ((connfd = accept(listenfd, (struct sockaddr *) &remote_addr, (socklen_t *) &len)) < 0) {
             perror("Accept failed: ");
         } else {
-            if(chat_size <= MAX_CONNECTIONS){
-            socketVariables *client = (socketVariables *)malloc(sizeof(socketVariables));
-            client->listenfd = connfd;
-            client->client_id = client_id++;
-            add_to_queue(client);
-            print_arr_queue(client);
-            chat_size++;
-            printf("chat size is %d\n", chat_size);
+            if(chat_size <= MAX_CONNECTIONS) {
+                socketVariables *client = (socketVariables *) malloc(sizeof(socketVariables));
+                client->listenfd = connfd;
+                client->client_id = client_id++;
+                add_to_queue(client);
+                print_arr_queue(client);
+                chat_size++;
+                printf("chat size is %d\n", chat_size);
+                inet_ntop(AF_INET, &(remote_addr.sin_addr), addressBuff, len);    //copy the address to string
+                printf("got connection from: %s:%d\n", addressBuff, ntohs(remote_addr.sin_port));
+                int *pclient = malloc(sizeof(int));
+                *pclient = connfd;
+                pthread_t t;
+                if ((pthread_create(&t, NULL, handle_connection, pclient)) != 0) {
+                    perror("new connection thread creation fail: ");
+                    return NULL;
+                }
             } else {
-                printf("Server reached max connections limit");
-                if(send(connfd, max_message, , 0)) < 0) {
+                printf("Server reached max connections limit\n");
+                fflush(stdout);
+                if(send(connfd, max_message, 1024, 0) < 0) {
                     perror("Send to client that connections maxed failed: ");
                 }
-
-            inet_ntop(AF_INET, &(remote_addr.sin_addr), addressBuff, len);    //copy the address to string
-            printf("got connection from: %s:%d\n", addressBuff, ntohs(remote_addr.sin_port));
-            int *pclient = malloc(sizeof(int));
-            *pclient = connfd;
-            pthread_t t;
-            if((pthread_create(&t, NULL, handle_connection, pclient)) != 0 ){
-                perror("new connection thread creation fail: ");
-                return NULL;
+                if(close(connfd) != 0){
+                    perror("closing extra connfd failed: ");
+                }
             }
 
         }
@@ -153,12 +162,18 @@ void *handle_connection(void *p_connfd){
     int connfd = *((int*)p_connfd);
     free(p_connfd);
     char recvBuff[recvBuffSize];
+    char exitMessage[1024];
+    strcpy(exitMessage, "Exited chat");
     while (1) {
         int read, err;
         if ((read = recv(connfd, recvBuff, recvBuffSize, 0)) < 0) {
             perror("Read from client failed: ");
         }
-        osEnqueue(message_queue, recvBuff);
+        printf("strlen of recvBuff is %ld\n", strlen(recvBuff));
+        if(strcmp(recvBuff, "exit") == 0){
+            remove_from_queue(&connfd);
+        }
+        broadcast_message(recvBuff);
         if (!read) {//done reading
             break;
         }
@@ -201,6 +216,23 @@ void print_arr_queue(void *data){
         if(clientIdArr[i]) {//only print connections that exist
             printf("connfd is %d\n", clientIdArr[i]->listenfd);
             printf("connfd id is %d\n", clientIdArr[i]->client_id);
+        }
+    }
+}
+
+void *broadcast_message(void *data){
+    printf("print message");
+    fflush(stdout);
+}
+
+void remove_from_queue(void *data){
+    int clientId= *((int*)data);
+    free(data);
+    for(int i =0; i<=MAX_CONNECTIONS; i++){
+        printf("comparing client id in %d place which is %d with given id %d\n", i, clientIdArr[i]->listenfd, clientId);
+        if(clientIdArr[i]->listenfd == clientId){
+            printf("should be removed\n");
+            fflush(stdout);
         }
     }
 }
