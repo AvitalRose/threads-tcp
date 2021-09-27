@@ -1,0 +1,9 @@
+Now testing without socket ip to connect to
+
+ Usage: ./client <ip of server> 
+Now testing connecting with server not connected
+Enter name: (from 1 up to 30 characters)
+Error: Connect Failed 
+Now testing name length
+Enter name: (from 1 up to 30 characters)
+Name to long, try connecting again
