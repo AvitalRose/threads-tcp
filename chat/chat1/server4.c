@@ -34,6 +34,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 
 #define MAX_CONNECTIONS 5
@@ -42,20 +43,21 @@
 typedef struct{
     int listenfd;
     int client_id;
+    char client_name[1024];
 } socketVariables;
 
 
 pthread_mutex_t connection_mutex;
 
 socketVariables *clientsArr[MAX_CONNECTIONS];
-int chat_size;
+int chat_size = 0;
 int uid = 1;
 
 
 void *handle_connection(void* p_uid);
 void *new_connection_handler(void* mainSocketDate);
 void add_to_queue(socketVariables *clientId);
-void print_arr_queue(void *data);
+void print_arr_queue();
 void *broadcast_message(char message[], int uid);
 void remove_from_queue(int uid);
 
@@ -108,63 +110,79 @@ void *new_connection_handler(void* p_listenfd){
     free(p_listenfd);
     struct sockaddr_in remote_addr;
     int  connfd, len, client_id = 1;
-    chat_size = 1;
     char addressBuff[300];
     char max_message[1024];
     strcpy(max_message, "Server reached max connections, try later");
+    char welcome_message[1024];
+    strcpy(welcome_message, "====Welcome to the chat====");
     pthread_mutex_init(&connection_mutex, NULL);
 
     while(1){
         if ((connfd = accept(listenfd, (struct sockaddr *) &remote_addr, (socklen_t *) &len)) < 0) {
             perror("Accept failed: ");
         }
-        pthread_t new_connection_thread;
-        int *p_client = malloc(sizeof(int));
-        *p_client = connfd;
-        pthread_create(&new_connection_thread, NULL, handle_connection, p_client);
+        chat_size = chat_size + 1;
+        printf("chat size is %d\n", chat_size);
+        if(chat_size > MAX_CONNECTIONS){
+            printf("reached max connections");
+            if(send(connfd, max_message, strlen(max_message), 0) < 0){
+                perror("sending max message failed\n");
+            }
+            close(connfd);//check here for success
+            chat_size--;
+        } else {
+            if(send(connfd, welcome_message, sizeof (welcome_message), 0) < 0){
+                perror("sending welcome message failed\n");
+            }
+            pthread_t new_connection_thread;
+            int *p_client = malloc(sizeof(int));
+            *p_client = connfd;
+            pthread_create(&new_connection_thread, NULL, handle_connection, p_client);
+        }
     }
 
 
 }
 
 void *handle_connection(void *p_uid){
-    printf("enterd function");
-
     //set up connection
+    printf("entered handle connection\n");
     int connfd = *((int*)p_uid);
     free(p_uid);
     char recvBuff[recvBuffSize];
     char exitMessage[1024];
     strcpy(exitMessage, "Exited chat");
+    bool setNameFlag = false;
 
     //set up socket
     socketVariables *client = (socketVariables *) malloc(sizeof(socketVariables));
     client->client_id = uid;
     client->listenfd = connfd;
     uid++;
+    if(recv(connfd, recvBuff, recvBuffSize, 0) < 0){
+        perror("Read name failed: ");
+    }
+    strcpy(client->client_name, recvBuff);
+    memset(recvBuff, 0, sizeof(recvBuff));
+
     add_to_queue(client);
+    print_arr_queue();
 
     while (1) {
         int read, err;
         if ((read = recv(connfd, recvBuff, recvBuffSize, 0)) < 0) {
             perror("Read from client failed: ");
         }
-        printf("strlen of recvBuff is %ld, recvBuff is %s\n", strlen(recvBuff), recvBuff);
-        if(strcmp(recvBuff, "exit") == 0){
-            printf("exit\n");
-            remove_from_queue(uid);
+        if(read > 0){
+            broadcast_message(recvBuff, client->client_id);
+        } else{
+            remove_from_queue(client->client_id);
+            int return_value = 1;
+            pthread_exit(&return_value);
         }
-        broadcast_message(recvBuff, client->client_id);
         memset(recvBuff, 0, sizeof(recvBuff));
-        recvBuff[0] = '\0';
-        printf("chopped it to zero\n");
-        if (!read) {//done reading
-            break;
-        }
-        if ((err = send(connfd, recvBuff, read, 0)) < 0) {
-            perror("Send back to client failed: ");
-        }
     }
+
 }
 
 
@@ -176,16 +194,16 @@ void add_to_queue(socketVariables *clientId){
             break;
         }
     }
-    chat_size++;
     pthread_mutex_unlock(&connection_mutex);
 }
 
-void print_arr_queue(void *data){
+void print_arr_queue(){
     pthread_mutex_lock(&connection_mutex);
     for(int i = 0; i < MAX_CONNECTIONS; i++){
         if(clientsArr[i]) {//only print connections that exist
             printf("connfd is %d\n", clientsArr[i]->listenfd);
             printf("connfd id is %d\n", clientsArr[i]->client_id);
+            printf("connfd name is %s\n", clientsArr[i]->client_name);
         }
     }
     pthread_mutex_unlock(&connection_mutex);
@@ -193,8 +211,7 @@ void print_arr_queue(void *data){
 
 void *broadcast_message(char message[], int uid){
     pthread_mutex_lock(&connection_mutex);
-    printf("print message %s from %d\n", message, uid);
-    fflush(stdout);
+    printf("message to broadcast: %s\n", message);
     for(int i = 0; i<MAX_CONNECTIONS; i++){
         if(clientsArr[i]){
             if(clientsArr[i]->client_id != uid){
@@ -216,9 +233,12 @@ void remove_from_queue(int uid){
             printf("comparing client id in %d place which is %d with given id %d\n", i, clientsArr[i]->listenfd, uid);
             if(clientsArr[i]->client_id == uid){
                 printf("should be removed %d\n", uid);
+                close(clientsArr[i]->listenfd);//when closing- does it terminate the thread too?
+                clientsArr[i] = NULL;
                 fflush(stdout);
             }
         }
     }
+    chat_size--;
     pthread_mutex_unlock(&connection_mutex);
 }

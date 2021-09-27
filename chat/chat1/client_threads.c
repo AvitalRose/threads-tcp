@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
 //    int sockfd = 0;
     struct sockaddr_in serv_addr;
     char sendBuff[BUFF_SIZE];
+    char recvBuff[BUFF_SIZE];
 
 
     if (argc != 2) {
@@ -37,9 +38,13 @@ int main(int argc, char *argv[]) {
     }
 
     //setting up name
-    printf("Enter name: (up to 100 characters)\n");
+    printf("Enter name: (from 1 up to 30 characters)\n");
     fflush(stdout);
     fgets(sendBuff, sizeof(sendBuff),stdin);
+    if(strlen(sendBuff) <= 0 || strlen(sendBuff)> 30){
+        printf("Name to long, try connecting again");
+        return -1;
+    }
     fflush(stdin);
     sendBuff[strlen(sendBuff) -1] = '\0';
 
@@ -64,7 +69,17 @@ int main(int argc, char *argv[]) {
     }
 
     if(send(sockfd, sendBuff, sizeof(sendBuff), 0) < 0){
-        perror("Send name failed: \n");
+        perror("Send name failed: ");
+    }
+
+    //get welocmed to chat
+    if(recv(sockfd , recvBuff , 1024 , 0) < 0){
+        perror("Recv welcome failed: ");
+    }
+    recvBuff[strlen(recvBuff)] = '\0';
+    printf("%s\n", recvBuff);
+    if(strcmp(recvBuff, "Server reached max connections, try later") == 0){
+        terminate();
     }
 
     //create listen and receive thread
@@ -117,7 +132,6 @@ void *send_func(void *p_sockfd){
         }
         printf("tried sending %s\n", sendBuff);
         memset(sendBuff, 0, sizeof(sendBuff));
-        sendBuff[0]='\0';
     }
 }
 
@@ -130,10 +144,10 @@ void *recv_func(void *p_sockfd){
     while(1){
         receive = recv(sockfd , recvBuff , 1024 , 0);
         if(receive > 0){
-            printf("received message\n");
             printf("%s\n", recvBuff);
             printf("->");
             fflush(stdout);
+            memset(recvBuff, 0, sizeof(recvBuff));
             recvBuff[0] = '\0';
         } else if(receive == 0) {
             break;
