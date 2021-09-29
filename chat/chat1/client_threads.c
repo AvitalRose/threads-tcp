@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 
 
     if (argc != 2) {
-        printf("\n Usage: %s <ip of server> \n", argv[0]);
+        printf("Usage: %s <ip of server> \n", argv[0]);
         return -1;
     }
 
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 
     //setting up client socket
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("\n Error: Could not create socket \n");
+        printf("Error: Could not create socket \n");
         return -1;
     }
 
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     serv_addr.sin_port = htons(15470);
 
     if (inet_pton(AF_INET, argv[1], &serv_addr.sin_addr) <= 0) {
-        printf("\n inet_pton error occured\n");
+        printf("inet_pton error occured\n");
         return -1;
     }
 
@@ -112,7 +112,6 @@ int main(int argc, char *argv[]) {
 //function to handle sending messages;
 void *send_func(void *p_sockfd){
     int sockfd= *((int*)p_sockfd);
-    free(p_sockfd);
     char sendBuff[BUFF_SIZE];
 
     while(1){
@@ -120,6 +119,10 @@ void *send_func(void *p_sockfd){
         fflush(stdout);
         fgets(sendBuff, sizeof(sendBuff),stdin);
         fflush(stdin);
+        if(strlen(sendBuff) <= 0 || strlen(sendBuff)> 100){
+            printf("Message to long, try again");
+            continue;
+        }
         sendBuff[strlen(sendBuff) -1] = '\0';
         if(strcmp(sendBuff, "exit") == 0){
             terminate();
@@ -130,7 +133,7 @@ void *send_func(void *p_sockfd){
             puts("Send failed");
             return NULL;
         }
-        printf("tried sending %s\n", sendBuff);
+        sleep(2);
         memset(sendBuff, 0, sizeof(sendBuff));
     }
 }
@@ -138,7 +141,6 @@ void *send_func(void *p_sockfd){
 //function to handle incoming messages
 void *recv_func(void *p_sockfd){
     int sockfd= *((int*)p_sockfd);
-    free(p_sockfd);
     char recvBuff[BUFF_SIZE];
     int receive;
     while(1){
@@ -152,6 +154,7 @@ void *recv_func(void *p_sockfd){
         } else if(receive == 0) {
             break;
         } else {
+            perror("recv failed: ");
             memset(recvBuff, 0, sizeof(recvBuff));
         }
     }
@@ -166,17 +169,14 @@ void intHandler(int sig_num){
 
 //function to terminate chat
 int terminate(){
-    printf("Terminating chat\n");
     char sendBuff[BUFF_SIZE];
     strcpy(sendBuff, "exit");
-    printf("send buff is %s\n", sendBuff);
     if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
     {
         puts("Send exit failed: ");
         return -1;
-    } else {
-        printf("sent exit message\n");
     }
     close(sockfd);
+    printf("Exited chat\n");
     exit(1);
 }

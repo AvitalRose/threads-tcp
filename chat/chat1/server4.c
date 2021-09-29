@@ -128,7 +128,9 @@ void *new_connection_handler(void* p_listenfd){
             if(send(connfd, max_message, strlen(max_message), 0) < 0){
                 perror("sending max message failed\n");
             }
-            close(connfd);//check here for success
+            if(close(connfd)){
+                perror("close fd failed: ");
+            }
             chat_size--;
         } else {
             if(send(connfd, welcome_message, sizeof (welcome_message), 0) < 0){
@@ -233,7 +235,10 @@ void remove_from_queue(int uid){
             printf("comparing client id in %d place which is %d with given id %d\n", i, clientsArr[i]->listenfd, uid);
             if(clientsArr[i]->client_id == uid){
                 printf("should be removed %d\n", uid);
-                close(clientsArr[i]->listenfd);//when closing- does it terminate the thread too?
+                if(close(clientsArr[i]->listenfd) !=0){
+                    //when closing- does it terminate the thread too?
+                    perror("close socket failed: ");
+                }
                 clientsArr[i] = NULL;
                 fflush(stdout);
             }
