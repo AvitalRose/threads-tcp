@@ -22,6 +22,7 @@ void *send_func(void *p_sockfd);
 void *recv_func(void *p_sockfd);
 void intHandler(int sig_num);
 int terminate();
+int external_terminate();
 
 int sockfd = 0;
 pthread_t send_thread;
@@ -82,7 +83,8 @@ int main(int argc, char *argv[]) {
     recvBuff[strlen(recvBuff)] = '\0';
     printf("%s\n", recvBuff);
     if(strcmp(recvBuff, "Server reached max connections, try later") == 0){
-        terminate();
+        close(sockfd);
+        exit(1);
     }
 
     //create listen and receive thread
@@ -121,7 +123,11 @@ int main(int argc, char *argv[]) {
     return 1;
 }
 
-//function to handle sending messages;
+/*
+ * Function to handle sending messages.
+ * Gets a pointer to a socket fd, returns nothing.
+ * Runs on infinite loop that accepts the clients message and checks if of right size. If so, send to server.
+ */
 void *send_func(void *p_sockfd){
     int sockfd= *((int*)p_sockfd);
     char sendBuff[BUFF_SIZE];
@@ -160,6 +166,11 @@ void *recv_func(void *p_sockfd){
     while(1){
         receive = recv(sockfd , recvBuff , 1024 , 0);
         if(receive > 0){
+            if(strcmp(recvBuff, "server shut down") == 0){
+                recvBuff[0] = '\0';
+                external_terminate();
+                break;
+            }
             printf("%s\n", recvBuff);
             printf("->");
             fflush(stdout);
@@ -172,8 +183,6 @@ void *recv_func(void *p_sockfd){
             memset(recvBuff, 0, sizeof(recvBuff));
         }
     }
-
-    printf("should never get here, recv func\n");
 }
 
 
@@ -196,6 +205,16 @@ int terminate(){
         perror("Send thread cancellation error: ");
     }
     if(pthread_cancel(recv_thread) != 0){
+        perror("Recv thread cancellation error: ");
+    }
+}
+
+int external_terminate(){
+    printf("Externaly shut down\n");
+    if(pthread_cancel(send_thread) != 0){
+        perror("Send thread cancellation error: ");
+    }
+    if(pthread_cancel(recv_thread) != 0){// cancel doesn't force immediate shut down, let's thread finish
         perror("Recv thread cancellation error: ");
     }
 }
