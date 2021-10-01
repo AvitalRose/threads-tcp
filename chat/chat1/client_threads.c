@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <errno.h>
 
 #define BUFF_SIZE 1024
 #define RECV_BUFF_SIZE 2048 //bigger buff for recv because of the name attached
@@ -23,7 +24,8 @@ void intHandler(int sig_num);
 int terminate();
 
 int sockfd = 0;
-
+pthread_t send_thread;
+pthread_t recv_thread;
 
 
 int main(int argc, char *argv[]) {
@@ -84,7 +86,7 @@ int main(int argc, char *argv[]) {
     }
 
     //create listen and receive thread
-    pthread_t send_thread;
+//    pthread_t send_thread;
     int *p_sockfd = malloc(sizeof(int));
     *p_sockfd = sockfd;
     if(pthread_create(&send_thread, NULL, send_func, p_sockfd) != 0){
@@ -92,7 +94,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    pthread_t recv_thread;
+//    pthread_t recv_thread;
     if(pthread_create(&recv_thread, NULL, recv_func, p_sockfd) != 0){
         perror("Send thread creation fail: ");
         return -1;
@@ -103,9 +105,18 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, intHandler);
 
     //wait for both threads to terminate
-    pthread_join(send_thread, NULL);
-    pthread_join(recv_thread, NULL);
+    int safe_send;
+    int safe_recv;
+    if((safe_send = pthread_join(send_thread, NULL)) != 0){
+        errno = safe_send;
+        perror("Send thread join fail: ");
+    }
+    if((safe_recv = pthread_join(recv_thread, NULL)) != 0){
+        errno = safe_recv;
+        perror("Recv thread join fail: ");
+    }
     close(sockfd);
+    printf("Exited chat\n");
 
     return 1;
 }
@@ -137,6 +148,8 @@ void *send_func(void *p_sockfd){
         sleep(2);
         memset(sendBuff, 0, sizeof(sendBuff));
     }
+
+    printf("should never get here, send func\n");
 }
 
 //function to handle incoming messages
@@ -159,6 +172,8 @@ void *recv_func(void *p_sockfd){
             memset(recvBuff, 0, sizeof(recvBuff));
         }
     }
+
+    printf("should never get here, recv func\n");
 }
 
 
@@ -177,7 +192,10 @@ int terminate(){
         puts("Send exit failed: ");
         return -1;
     }
-    close(sockfd);
-    printf("Exited chat\n");
-    exit(1);
+    if(pthread_cancel(send_thread) != 0){
+        perror("Send thread cancellation error: ");
+    }
+    if(pthread_cancel(recv_thread) != 0){
+        perror("Recv thread cancellation error: ");
+    }
 }
