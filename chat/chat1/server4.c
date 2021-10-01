@@ -213,12 +213,22 @@ void print_arr_queue(){
 
 void *broadcast_message(char message[], int uid){
     pthread_mutex_lock(&connection_mutex);
-    printf("message to broadcast: %s\n", message);
+    char message_with_name[2048];
+    for (int i = 0; i<MAX_CONNECTIONS; i++){
+        if(clientsArr[i]){
+            if(clientsArr[i]->client_id == uid){
+                strcpy(message_with_name, clientsArr[i]->client_name);
+            }
+        }
+    }
+    strcat(message_with_name, ": ");
+    strcat(message_with_name, message);
+    printf("message to broadcast: %s\n", message_with_name);
     for(int i = 0; i<MAX_CONNECTIONS; i++){
         if(clientsArr[i]){
             if(clientsArr[i]->client_id != uid){
                 printf("send to %d\n", clientsArr[i]->client_id);
-                if(send(clientsArr[i]->listenfd, message, strlen(message), 0) < 0){
+                if(send(clientsArr[i]->listenfd, message_with_name, strlen(message_with_name), 0) < 0){
                     perror("Broadcast message failed: ");
                 }
             }

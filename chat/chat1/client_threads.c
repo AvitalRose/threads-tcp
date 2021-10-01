@@ -15,6 +15,7 @@
 #include <signal.h>
 
 #define BUFF_SIZE 1024
+#define RECV_BUFF_SIZE 2048 //bigger buff for recv because of the name attached
 
 void *send_func(void *p_sockfd);
 void *recv_func(void *p_sockfd);
@@ -29,7 +30,7 @@ int main(int argc, char *argv[]) {
 //    int sockfd = 0;
     struct sockaddr_in serv_addr;
     char sendBuff[BUFF_SIZE];
-    char recvBuff[BUFF_SIZE];
+    char recvBuff[RECV_BUFF_SIZE];
 
 
     if (argc != 2) {
@@ -141,7 +142,7 @@ void *send_func(void *p_sockfd){
 //function to handle incoming messages
 void *recv_func(void *p_sockfd){
     int sockfd= *((int*)p_sockfd);
-    char recvBuff[BUFF_SIZE];
+    char recvBuff[RECV_BUFF_SIZE];
     int receive;
     while(1){
         receive = recv(sockfd , recvBuff , 1024 , 0);
@@ -170,7 +171,7 @@ void intHandler(int sig_num){
 //function to terminate chat
 int terminate(){
     char sendBuff[BUFF_SIZE];
-    strcpy(sendBuff, "exit");
+    strcpy(sendBuff, "exited chat");
     if(send(sockfd ,sendBuff, strlen(sendBuff) , 0) < 0)
     {
         puts("Send exit failed: ");
