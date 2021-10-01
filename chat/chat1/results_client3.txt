@@ -1,0 +1,10 @@
+Enter name: (from 1 up to 30 characters)
+====Welcome to the chat====
+->client2 name: client2 message4
+->client1 name: client1 message4
+->->client2 name: client2 message5
+->client1 name: client1 message5
+->->client2 name: client2 message6
+->client1 name: client1 message6
+->->client1 name: exited chatclient2 name: exited chat
+->->Exited chat
